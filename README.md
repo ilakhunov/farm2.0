@@ -248,3 +248,4 @@ farm2.0/
 - `scripts/system_health_check.sh` - Проверка системных ресурсов
 - `scripts/create_initial_migration.sh` - Генерация миграций
 - `scripts/optimize_system.sh` - Оптимизация системы (остановка Gradle daemons)
+# farm2.0
