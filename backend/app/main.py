@@ -38,6 +38,17 @@ app.include_router(payments.router, prefix=settings.api_v1_prefix)
 app.include_router(deliveries.router, prefix=settings.api_v1_prefix)
 
 
+@app.get("/", tags=["root"])
+async def root() -> dict[str, str]:
+    return {
+        "message": "Farm Platform API",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "health": "/health",
+        "api": settings.api_v1_prefix,
+    }
+
+
 @app.get("/health", tags=["health"])
 async def health_check() -> dict[str, str]:
     return {"status": "ok"}

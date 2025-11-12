@@ -51,3 +51,7 @@ class UserProfile(BaseModel):
 class AuthResponse(BaseModel):
     token: TokenResponse
     user: UserProfile
+
+
+class LogoutResponse(BaseModel):
+    message: str = "Successfully logged out"

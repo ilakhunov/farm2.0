@@ -35,22 +35,56 @@ class AuthRepository {
     String? bankAccount,
     String? email,
   }) async {
-    final response = await _client.post<Map<String, dynamic>>(
-      '/auth/verify-otp',
-      data: {
-        'phone_number': phoneNumber,
-        'code': code,
-        if (role != null) 'role': role,
-        if (entityType != null) 'entity_type': entityType,
-        if (taxId != null) 'tax_id': taxId,
-        if (legalName != null) 'legal_name': legalName,
-        if (legalAddress != null) 'legal_address': legalAddress,
-        if (bankAccount != null) 'bank_account': bankAccount,
-        if (email != null) 'email': email,
-      },
-    );
+    try {
+      final response = await _client.post<Map<String, dynamic>>(
+        '/auth/verify-otp',
+        data: {
+          'phone_number': phoneNumber,
+          'code': code,
+          if (role != null) 'role': role,
+          if (entityType != null) 'entity_type': entityType,
+          if (taxId != null) 'tax_id': taxId,
+          if (legalName != null) 'legal_name': legalName,
+          if (legalAddress != null) 'legal_address': legalAddress,
+          if (bankAccount != null) 'bank_account': bankAccount,
+          if (email != null) 'email': email,
+        },
+      );
 
-    final data = response.data ?? {};
-    return AuthResponse.fromJson(data);
+      final data = response.data ?? {};
+      if (data.isEmpty) {
+        throw Exception('Empty response from server');
+      }
+      
+      return AuthResponse.fromJson(data);
+    } on DioException {
+      // Пробрасываем DioException дальше для обработки в UI
+      rethrow;
+    } catch (e) {
+      // Оборачиваем другие ошибки в DioException для единообразной обработки
+      throw DioException(
+        requestOptions: RequestOptions(path: '/auth/verify-otp'),
+        error: e,
+        type: DioExceptionType.unknown,
+      );
+    }
+  }
+
+  Future<void> logout() async {
+    try {
+      await _client.post<Map<String, dynamic>>(
+        '/auth/logout',
+      );
+    } on DioException {
+      // Пробрасываем DioException дальше для обработки в UI
+      rethrow;
+    } catch (e) {
+      // Оборачиваем другие ошибки в DioException для единообразной обработки
+      throw DioException(
+        requestOptions: RequestOptions(path: '/auth/logout'),
+        error: e,
+        type: DioExceptionType.unknown,
+      );
+    }
   }
 }

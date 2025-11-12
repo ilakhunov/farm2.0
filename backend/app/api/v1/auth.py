@@ -8,12 +8,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.dependencies import get_current_user
 from app.core.security import create_token
 from app.db.session import get_db
 from app.models.otp import PhoneOTP
 from app.models.user import EntityType, User, UserRole
 from app.schemas.auth import (
     AuthResponse,
+    LogoutResponse,
     SendOTPRequest,
     TokenResponse,
     UserProfile,
@@ -162,6 +164,20 @@ def _update_user_metadata(user: User, payload: VerifyOTPRequest) -> None:
         user.bank_account = payload.bank_account
     if payload.email:
         user.email = payload.email
+
+
+@router.post("/logout", response_model=LogoutResponse, status_code=status.HTTP_200_OK)
+async def logout(
+    current_user: User = Depends(get_current_user),
+) -> LogoutResponse:
+    """
+    Logout endpoint for all user roles (farmer, shop, admin).
+    
+    Note: Since we're using stateless JWT tokens, the client should remove
+    the tokens from local storage. In a production environment, you might
+    want to implement a token blacklist using Redis.
+    """
+    return LogoutResponse(message="Successfully logged out")
 
 
 def _map_user_profile(user: User) -> UserProfile:

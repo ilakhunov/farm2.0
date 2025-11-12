@@ -31,3 +31,4 @@ build/
 
 # Local env files
 backend/.env
+farm2.0/

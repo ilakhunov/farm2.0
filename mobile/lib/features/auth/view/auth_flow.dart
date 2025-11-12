@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/localization/app_localizations.dart';
 import '../../../core/storage/token_storage.dart';
+import '../../../core/storage/user_storage.dart';
 import '../../products/view/product_catalog_screen.dart';
 import '../data/auth_repository.dart';
 import '../models/auth_models.dart';
@@ -35,7 +36,29 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
       });
       return debugOtp;
     } on DioException catch (error) {
-      _showError(error.message ?? 'Request failed');
+      String errorMessage = 'Request failed';
+      
+      // Извлекаем детальное сообщение из ответа backend
+      if (error.response != null) {
+        final data = error.response!.data;
+        if (data is Map<String, dynamic> && data.containsKey('detail')) {
+          errorMessage = data['detail'].toString();
+        } else if (error.response!.statusMessage != null) {
+          errorMessage = error.response!.statusMessage!;
+        }
+      } else if (error.message != null) {
+        errorMessage = error.message!;
+      }
+      
+      // Обработка специфичных ошибок
+      if (error.type == DioExceptionType.connectionTimeout ||
+          error.type == DioExceptionType.receiveTimeout) {
+        errorMessage = 'Connection timeout. Please check your internet connection.';
+      } else if (error.type == DioExceptionType.connectionError) {
+        errorMessage = 'Cannot connect to server. Please check your internet connection.';
+      }
+      
+      _showError(errorMessage);
       rethrow;
     } catch (error) {
       _showError(error.toString());
@@ -59,6 +82,11 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
     await TokenStorage.saveTokens(
       accessToken: response.tokens.accessToken,
       refreshToken: response.tokens.refreshToken,
+    );
+    await UserStorage.saveUser(
+      role: response.user.role,
+      id: response.user.id,
+      phoneNumber: response.user.phoneNumber,
     );
     if (!mounted) return;
     final strings = AppLocalizations.of(context);

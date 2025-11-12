@@ -35,7 +35,7 @@ class Transaction(Base):
     status: Mapped[TransactionStatus] = mapped_column(default=TransactionStatus.PENDING, nullable=False)
     external_id: Mapped[str | None] = mapped_column(String(255), nullable=True)  # ID from payment provider
     payment_method: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    metadata: Mapped[str | None] = mapped_column(String(2000), nullable=True)  # JSON string for additional data
+    payment_metadata: Mapped[str | None] = mapped_column(String(2000), nullable=True)  # JSON string for additional data
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 

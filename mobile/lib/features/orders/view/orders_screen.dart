@@ -1,5 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../auth/data/auth_repository.dart';
+import '../../auth/view/auth_flow.dart';
+import '../../../core/localization/app_localizations.dart';
+import '../../../core/storage/token_storage.dart';
 import '../../shared/widgets/loading_view.dart';
 import '../data/order_repository.dart';
 import '../models/order.dart';
@@ -13,6 +18,7 @@ class OrdersScreen extends StatefulWidget {
 
 class _OrdersScreenState extends State<OrdersScreen> {
   final _repository = OrderRepository();
+  final _authRepository = AuthRepository();
   late Future<List<Order>> _future;
 
   @override
@@ -26,6 +32,54 @@ class _OrdersScreenState extends State<OrdersScreen> {
       _future = _repository.fetchOrders();
     });
     await _future;
+  }
+
+  Future<void> _handleLogout() async {
+    final strings = AppLocalizations.of(context);
+    
+    // Показываем диалог подтверждения
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(strings.translate('logout') ?? 'Выход'),
+        content: Text(strings.translate('logout_confirm') ?? 'Вы уверены, что хотите выйти?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(strings.translate('cancel') ?? 'Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(strings.translate('logout') ?? 'Выход'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      // Вызываем API logout
+      await _authRepository.logout();
+    } on DioException catch (e) {
+      // Игнорируем ошибки при logout (токен может быть уже невалидным)
+      debugPrint('Logout error: ${e.message}');
+    } catch (e) {
+      debugPrint('Logout error: $e');
+    } finally {
+      // Всегда очищаем токены и перенаправляем на экран авторизации
+      await TokenStorage.clear();
+      if (!mounted) return;
+      
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AuthFlowScreen()),
+        (route) => false,
+      );
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(strings.translate('logout_success') ?? 'Вы успешно вышли')),
+      );
+    }
   }
 
   void _showOrderDetails(Order order) {
@@ -65,7 +119,16 @@ class _OrdersScreenState extends State<OrdersScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Мои заказы')),
+      appBar: AppBar(
+        title: const Text('Мои заказы'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Выход',
+            onPressed: _handleLogout,
+          ),
+        ],
+      ),
       body: FutureBuilder<List<Order>>(
         future: _future,
         builder: (context, snapshot) {
@@ -78,9 +141,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  const Icon(Icons.error_outline, size: 64, color: Colors.grey),
+                  const SizedBox(height: 16),
                   const Text('Не удалось загрузить заказы'),
                   const SizedBox(height: 8),
-                  ElevatedButton(onPressed: _refresh, child: const Text('Повторить')),
+                  ElevatedButton(
+                    onPressed: _refresh,
+                    child: const Text('Повторить'),
+                  ),
                 ],
               ),
             );
@@ -88,7 +156,21 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
           final orders = snapshot.data ?? [];
           if (orders.isEmpty) {
-            return const Center(child: Text('Заказы отсутствуют'));
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  const Text('Заказы отсутствуют'),
+                  const SizedBox(height: 8),
+                  ElevatedButton(
+                    onPressed: _refresh,
+                    child: const Text('Обновить'),
+                  ),
+                ],
+              ),
+            );
           }
 
           return RefreshIndicator(

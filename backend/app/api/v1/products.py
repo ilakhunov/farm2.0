@@ -125,7 +125,7 @@ async def delete_product(
     product_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> None:
+):
     stmt = select(Product).where(Product.id == product_id)
     result = await db.execute(stmt)
     product = result.scalar_one_or_none()

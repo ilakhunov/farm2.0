@@ -1,6 +1,11 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../auth/data/auth_repository.dart';
+import '../../auth/view/auth_flow.dart';
+import '../../../core/localization/app_localizations.dart';
+import '../../../core/storage/token_storage.dart';
 import '../../orders/data/order_repository.dart';
 import '../../payments/data/payment_repository.dart';
 import '../../products/models/product.dart';
@@ -17,6 +22,7 @@ class ProductDetailScreen extends StatefulWidget {
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   final _orderRepository = OrderRepository();
   final _paymentRepository = PaymentRepository();
+  final _authRepository = AuthRepository();
   final _quantityController = TextEditingController(text: '1');
   bool _isProcessing = false;
 
@@ -24,6 +30,54 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   void dispose() {
     _quantityController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleLogout() async {
+    final strings = AppLocalizations.of(context);
+    
+    // Показываем диалог подтверждения
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(strings.translate('logout') ?? 'Выход'),
+        content: Text(strings.translate('logout_confirm') ?? 'Вы уверены, что хотите выйти?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(strings.translate('cancel') ?? 'Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(strings.translate('logout') ?? 'Выход'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      // Вызываем API logout
+      await _authRepository.logout();
+    } on DioException catch (e) {
+      // Игнорируем ошибки при logout (токен может быть уже невалидным)
+      debugPrint('Logout error: ${e.message}');
+    } catch (e) {
+      debugPrint('Logout error: $e');
+    } finally {
+      // Всегда очищаем токены и перенаправляем на экран авторизации
+      await TokenStorage.clear();
+      if (!mounted) return;
+      
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AuthFlowScreen()),
+        (route) => false,
+      );
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(strings.translate('logout_success') ?? 'Вы успешно вышли')),
+      );
+    }
   }
 
   Future<void> _createOrder() async {
@@ -98,6 +152,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(product.name),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Выход',
+            onPressed: _handleLogout,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
