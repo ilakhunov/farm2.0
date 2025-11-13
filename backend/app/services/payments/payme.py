@@ -43,6 +43,14 @@ class PaymeAdapter(PaymentAdapter):
         **kwargs: Any,
     ) -> dict[str, Any]:
         """Create payment request with Payme."""
+        settings = get_settings()
+        
+        # Use mock mode if configured
+        if settings.sms_provider == "dev" or settings.payment_mock_mode:
+            from app.services.payments.mock import MockAdapter
+            mock = MockAdapter()
+            return await mock.create_payment(transaction, amount, order_id, **kwargs)
+        
         # TODO: Implement Payme payment creation
         # Reference: https://developer.help.paycom.uz/ru/protokol-merchant-api
         logger.info(f"Creating Payme payment for order {order_id}, amount {amount}")

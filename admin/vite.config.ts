@@ -7,6 +7,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     server: {
+      host: true, // Listen on all addresses for cross-device access
       port: 5173,
     },
     define: {

@@ -6,10 +6,10 @@ import { ordersApi, deliveriesApi, Delivery } from '../lib/api-client';
 const STATUS_LABELS: Record<Delivery['status'], string> = {
   pending: 'Ожидает',
   assigned: 'Назначен',
-  picked_up: 'Забран',
   in_transit: 'В пути',
   delivered: 'Доставлен',
   failed: 'Не удалось',
+  cancelled: 'Отменён',
 };
 
 export function DeliveriesPage() {
@@ -57,8 +57,8 @@ export function DeliveriesPage() {
     if (!selectedOrderId) return;
     updateMutation.mutate({
       status: deliveryData?.status || 'pending',
-      driver_name: driverName || undefined,
-      driver_phone: driverPhone || undefined,
+      courier_name: driverName || undefined,
+      courier_phone: driverPhone || undefined,
     });
   };
 
@@ -124,30 +124,30 @@ export function DeliveriesPage() {
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">Имя водителя</label>
+                <label className="mb-1 block text-xs font-medium text-slate-700">Имя курьера</label>
                 <input
                   type="text"
                   className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  value={driverName || deliveryData.driver_name || ''}
+                  value={driverName || deliveryData.courier_name || ''}
                   onChange={(e) => setDriverName(e.target.value)}
-                  placeholder="Введите имя водителя"
+                  placeholder="Введите имя курьера"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">Телефон водителя</label>
+                <label className="mb-1 block text-xs font-medium text-slate-700">Телефон курьера</label>
                 <input
                   type="tel"
                   className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  value={driverPhone || deliveryData.driver_phone || ''}
+                  value={driverPhone || deliveryData.courier_phone || ''}
                   onChange={(e) => setDriverPhone(e.target.value)}
                   placeholder="+998901234567"
                 />
               </div>
-              {deliveryData.estimated_delivery_at && (
+              {deliveryData.estimated_delivery && (
                 <div>
                   <label className="mb-1 block text-xs font-medium text-slate-700">Ожидаемая доставка</label>
                   <div className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm">
-                    {formatDate(deliveryData.estimated_delivery_at)}
+                    {formatDate(deliveryData.estimated_delivery)}
                   </div>
                 </div>
               )}

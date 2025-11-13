@@ -43,6 +43,15 @@ class ClickAdapter(PaymentAdapter):
         **kwargs: Any,
     ) -> dict[str, Any]:
         """Create payment request with Click."""
+        from app.core.config import get_settings
+        settings = get_settings()
+        
+        # Use mock mode if configured
+        if settings.sms_provider == "dev" or settings.payment_mock_mode:
+            from app.services.payments.mock import MockAdapter
+            mock = MockAdapter()
+            return await mock.create_payment(transaction, amount, order_id, **kwargs)
+        
         # TODO: Implement Click merchant/prepare endpoint
         # Reference: Click merchant API documentation
         logger.info(f"Creating Click payment for order {order_id}, amount {amount}")

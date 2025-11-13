@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/storage/token_storage.dart';
+import '../../../core/widgets/bottom_navigation.dart';
 import '../../shared/widgets/loading_view.dart';
 import '../data/order_repository.dart';
 import '../models/order.dart';
@@ -26,6 +29,33 @@ class _OrdersScreenState extends State<OrdersScreen> {
       _future = _repository.fetchOrders();
     });
     await _future;
+  }
+
+  Future<void> _logout() async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Выход из системы'),
+        content: const Text('Вы уверены, что хотите выйти?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Выйти'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldLogout == true) {
+      await TokenStorage.clear();
+      if (!mounted) return;
+      context.go('/auth');
+    }
   }
 
   void _showOrderDetails(Order order) {
@@ -64,8 +94,35 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentLocation = GoRouterState.of(context).matchedLocation;
+    
     return Scaffold(
-      appBar: AppBar(title: const Text('Мои заказы')),
+      appBar: AppBar(
+        title: const Text('Мои заказы'),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.account_circle),
+            tooltip: 'Профиль',
+            onSelected: (value) {
+              if (value == 'logout') {
+                _logout();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, size: 20),
+                    SizedBox(width: 8),
+                    Text('Выйти'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
       body: FutureBuilder<List<Order>>(
         future: _future,
         builder: (context, snapshot) {

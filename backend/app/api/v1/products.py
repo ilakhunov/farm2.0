@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -12,6 +13,7 @@ from app.models.product import Product, ProductCategory
 from app.models.user import User, UserRole
 from app.schemas.product import ProductCreate, ProductListResponse, ProductResponse, ProductUpdate
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/products", tags=["products"])
 
 
@@ -24,20 +26,30 @@ async def create_product(
     if current_user.role != UserRole.FARMER:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only farmers can create products")
 
-    product = Product(
-        farmer_id=current_user.id,
-        name=payload.name,
-        description=payload.description,
-        category=payload.category,
-        price=payload.price,
-        quantity=payload.quantity,
-        unit=payload.unit,
-        image_url=payload.image_url,
-    )
-    db.add(product)
-    await db.commit()
-    await db.refresh(product)
-    return ProductResponse.model_validate(product)
+    try:
+        logger.info(f"Creating product for farmer {current_user.id}: {payload.name}")
+        product = Product(
+            farmer_id=current_user.id,
+            name=payload.name,
+            description=payload.description,
+            category=payload.category,
+            price=payload.price,
+            quantity=payload.quantity,
+            unit=payload.unit,
+            image_url=payload.image_url,
+        )
+        db.add(product)
+        await db.commit()
+        await db.refresh(product)
+        logger.info(f"Product created successfully: {product.id}")
+        return ProductResponse.model_validate(product)
+    except Exception as e:
+        logger.error(f"Error creating product: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create product: {str(e)}"
+        ) from e
 
 
 @router.get("", response_model=ProductListResponse)
@@ -120,7 +132,7 @@ async def update_product(
     return ProductResponse.model_validate(product)
 
 
-@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_product(
     product_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -135,6 +147,25 @@ async def delete_product(
     
     if product.farmer_id != current_user.id and current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to delete this product")
+    
+    # Check if product has active orders
+    from app.models.order import Order, OrderItem, OrderStatus
+    from sqlalchemy import and_
+    
+    order_items_stmt = select(OrderItem).join(Order).where(
+        and_(
+            OrderItem.product_id == product.id,
+            Order.status.in_([OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.PROCESSING, OrderStatus.SHIPPED])
+        )
+    )
+    order_items_result = await db.execute(order_items_stmt)
+    active_order_items = order_items_result.scalars().all()
+    
+    if active_order_items:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete product with active orders"
+        )
     
     await db.delete(product)
     await db.commit()

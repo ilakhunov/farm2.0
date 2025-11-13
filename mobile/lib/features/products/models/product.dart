@@ -12,6 +12,8 @@ class Product extends Equatable {
     required this.unit,
     required this.isActive,
     required this.imageUrl,
+    required this.createdAt,
+    required this.updatedAt,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -26,6 +28,8 @@ class Product extends Equatable {
       unit: json['unit'] as String? ?? 'kg',
       isActive: json['is_active'] as bool? ?? true,
       imageUrl: json['image_url'] as String?,
+      createdAt: DateTime.parse(json['created_at'] as String),
+      updatedAt: DateTime.parse(json['updated_at'] as String),
     );
   }
 
@@ -54,7 +58,9 @@ class Product extends Equatable {
   final String unit;
   final bool isActive;
   final String? imageUrl;
+  final DateTime createdAt;
+  final DateTime updatedAt;
 
   @override
-  List<Object?> get props => [id, name, category, price, quantity, unit, imageUrl, isActive, farmerId];
+  List<Object?> get props => [id, name, category, price, quantity, unit, imageUrl, isActive, farmerId, createdAt, updatedAt];
 }

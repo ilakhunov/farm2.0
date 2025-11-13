@@ -119,7 +119,7 @@ async def verify_otp(payload: VerifyOTPRequest, db: AsyncSession = Depends(get_d
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Role mismatch")
         _update_user_metadata(user, payload)
 
-    await db.delete(otp)
+    db.delete(otp)
     await db.commit()
     await db.refresh(user)
 
@@ -144,8 +144,7 @@ async def verify_otp(payload: VerifyOTPRequest, db: AsyncSession = Depends(get_d
 
 
 def _resolve_entity_type(payload: VerifyOTPRequest) -> EntityType | None:
-    if payload.role == UserRole.FARMER:
-        return EntityType.FARMER
+    # EntityType doesn't have FARMER value, return None or payload.entity_type
     return payload.entity_type
 
 

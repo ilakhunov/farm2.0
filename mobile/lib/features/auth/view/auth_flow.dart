@@ -1,9 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/app_localizations.dart';
 import '../../../core/storage/token_storage.dart';
-import '../../products/view/product_catalog_screen.dart';
+import '../../../core/storage/user_storage.dart';
 import '../data/auth_repository.dart';
 import '../models/auth_models.dart';
 import 'otp_verification_screen.dart';
@@ -60,15 +61,16 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
       accessToken: response.tokens.accessToken,
       refreshToken: response.tokens.refreshToken,
     );
+    // Save user information
+    await UserStorage.saveUser(response.user);
     if (!mounted) return;
     final strings = AppLocalizations.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(strings.translate('auth_success'))),
     );
-    // Navigate to catalog
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const ProductCatalogScreen()),
-    );
+    // Navigate to catalog using GoRouter
+    if (!mounted) return;
+    context.go('/products');
   }
 
   void _restart() {

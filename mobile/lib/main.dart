@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'core/localization/app_localizations.dart';
-import 'features/auth/view/auth_flow.dart';
+import 'core/router/app_router.dart';
 
 void main() {
   runApp(const FarmApp());
@@ -13,7 +13,7 @@ class FarmApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'Farm Platform',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -33,7 +33,7 @@ class FarmApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      home: const AuthFlowScreen(),
+      routerConfig: AppRouter.router,
     );
   }
 }

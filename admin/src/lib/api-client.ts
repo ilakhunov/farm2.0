@@ -98,7 +98,8 @@ export interface Product {
   quantity: number;
   unit: string;
   image_url?: string | null;
-  is_available: boolean;
+  is_active: boolean;
+  is_available?: boolean; // Legacy field
   created_at: string;
   updated_at: string;
 }
@@ -110,13 +111,42 @@ export interface ProductsResponse {
   offset: number;
 }
 
+export interface ProductCreate {
+  name: string;
+  description?: string;
+  category: string;
+  price: number;
+  quantity: number;
+  unit: string;
+  image_url?: string;
+}
+
+export interface ProductUpdate {
+  name?: string;
+  description?: string;
+  category?: string;
+  price?: number;
+  quantity?: number;
+  unit?: string;
+  image_url?: string;
+  is_active?: boolean;
+}
+
 export const productsApi = {
-  async list(params?: { limit?: number; offset?: number; category?: string; farmer_id?: string }) {
+  async list(params?: { limit?: number; offset?: number; category?: string; farmer_id?: string; search?: string }) {
     const response = await apiClient.get<ProductsResponse>('/products', { params });
     return response.data;
   },
   async get(id: string) {
     const response = await apiClient.get<Product>(`/products/${id}`);
+    return response.data;
+  },
+  async create(data: ProductCreate) {
+    const response = await apiClient.post<Product>('/products', data);
+    return response.data;
+  },
+  async update(id: string, data: ProductUpdate) {
+    const response = await apiClient.patch<Product>(`/products/${id}`, data);
     return response.data;
   },
   async delete(id: string) {
@@ -137,7 +167,7 @@ export interface Order {
   id: string;
   shop_id: string;
   farmer_id: string;
-  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'delivering' | 'delivered' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   total_amount: number;
   delivery_address?: string | null;
   notes?: string | null;
@@ -172,12 +202,13 @@ export const ordersApi = {
 export interface Delivery {
   id: string;
   order_id: string;
-  status: 'pending' | 'assigned' | 'picked_up' | 'in_transit' | 'delivered' | 'failed';
-  delivery_address?: string | null;
-  estimated_delivery_at?: string | null;
+  status: 'pending' | 'assigned' | 'in_transit' | 'delivered' | 'failed' | 'cancelled';
+  delivery_address: string;
+  courier_name?: string | null;
+  courier_phone?: string | null;
+  tracking_number?: string | null;
+  estimated_delivery?: string | null;
   delivered_at?: string | null;
-  driver_name?: string | null;
-  driver_phone?: string | null;
   notes?: string | null;
   created_at: string;
   updated_at: string;
@@ -189,8 +220,48 @@ export const deliveriesApi = {
     const response = await apiClient.get<Delivery>(`/deliveries/order/${orderId}`);
     return response.data;
   },
-  async update(orderId: string, data: Partial<Pick<Delivery, 'status' | 'driver_name' | 'driver_phone' | 'estimated_delivery_at' | 'notes'>>) {
+  async update(orderId: string, data: Partial<Pick<Delivery, 'status' | 'courier_name' | 'courier_phone' | 'estimated_delivery' | 'tracking_number' | 'notes'>>) {
     const response = await apiClient.patch<Delivery>(`/deliveries/order/${orderId}`, data);
     return response.data;
+  },
+};
+
+// Users API
+export interface User {
+  id: string;
+  phone_number: string;
+  role: 'farmer' | 'shop' | 'admin';
+  entity_type?: string | null;
+  tax_id?: string | null;
+  legal_name?: string | null;
+  legal_address?: string | null;
+  bank_account?: string | null;
+  email?: string | null;
+  is_verified: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export const usersApi = {
+  async getMe() {
+    const response = await apiClient.get<User>('/users/me');
+    return response.data;
+  },
+  async updateMe(data: Partial<Pick<User, 'legal_name' | 'legal_address' | 'bank_account' | 'email'>>) {
+    const response = await apiClient.patch<User>('/users/me', data);
+    return response.data;
+  },
+  async list(params?: { role?: 'farmer' | 'shop' | 'admin'; limit?: number; offset?: number }) {
+    try {
+      const response = await apiClient.get<User[]>('/users', { params });
+      return response.data;
+    } catch (error: any) {
+      // If endpoint doesn't exist or user is not admin, return empty list
+      if (error.response?.status === 403 || error.response?.status === 404) {
+        return [];
+      }
+      throw error;
+    }
   },
 };
