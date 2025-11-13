@@ -101,4 +101,38 @@ class OrderRepository {
       throw Exception('Failed to fetch order: ${e.message}');
     }
   }
+
+  Future<Order> updateOrderStatus({
+    required String orderId,
+    required String status,
+  }) async {
+    try {
+      final response = await _client.patch<Map<String, dynamic>>(
+        '/orders/$orderId',
+        data: {'status': status},
+      );
+
+      if (response.statusCode != null && response.statusCode! >= 400) {
+        final errorDetail = response.data?['detail'] as String?;
+        throw DioException(
+          requestOptions: response.requestOptions,
+          response: response,
+          type: DioExceptionType.badResponse,
+          error: errorDetail,
+        );
+      }
+
+      final data = response.data ?? {};
+      return Order.fromJson(data);
+    } on DioException catch (e) {
+      final errorDetail = e.response?.data?['detail'] as String?;
+      if (e.response?.statusCode == 401) {
+        throw Exception('Unauthorized. Please login again.');
+      }
+      if (e.response?.statusCode == 403) {
+        throw Exception('Not authorized to update this order.');
+      }
+      throw Exception(errorDetail ?? 'Failed to update order: ${e.message}');
+    }
+  }
 }

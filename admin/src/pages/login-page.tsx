@@ -7,35 +7,19 @@ import { authApi } from '../lib/api-client';
 import { saveAuth } from '../lib/auth-storage';
 
 interface LoginFormValues {
-  phone: string;
-  code?: string;
+  username: string;
+  password: string;
 }
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [debugOtp, setDebugOtp] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const { register, handleSubmit, formState, setError } = useForm<LoginFormValues>({
-    defaultValues: { phone: '+998' },
+  const { register, handleSubmit, formState } = useForm<LoginFormValues>({
+    defaultValues: { username: '', password: '' },
   });
 
-  const normalizePhone = (value: string) => {
-    const digits = value.replace(/\D/g, '');
-    if (digits.length < 9) {
-      return null;
-    }
-    if (digits.startsWith('998') && digits.length === 12) {
-      return `+${digits}`;
-    }
-    if (digits.length === 9) {
-      return `+998${digits}`;
-    }
-    return `+${digits}`;
-  };
-
-  const extractErrorMessage = (error: unknown) => {
+  const extractErrorMessage = (error: unknown): string => {
     if (error instanceof AxiosError) {
       const detail = (error.response?.data as { detail?: string })?.detail;
       return detail ?? error.message;
@@ -50,112 +34,105 @@ export function LoginPage() {
     setIsSubmitting(true);
     setErrorMessage(null);
     try {
-      const phone = normalizePhone(values.phone);
-      if (!phone) {
-        setError('phone', { type: 'manual', message: 'Введите корректный номер' });
-        return;
-      }
-
-      if (step === 'phone') {
-        const response = await authApi.sendOtp({ phone_number: phone, role: 'admin' });
-        setStep('otp');
-        setDebugOtp(response.debug?.otp ?? null);
-      } else {
-        if (!values.code) {
-          setError('code', { type: 'manual', message: 'Введите код' });
-          return;
-        }
-        const auth = await authApi.verifyOtp({ phone_number: phone, code: values.code.trim(), role: 'admin' });
-        saveAuth(auth.token, auth.user.role);
-        navigate('/app');
-      }
+      const auth = await authApi.login({
+        username: values.username.trim(),
+        password: values.password,
+      });
+      saveAuth(auth.token, auth.user.role);
+      navigate('/app');
     } catch (error) {
       const message = extractErrorMessage(error);
       setErrorMessage(message);
-      if (step === 'otp') {
-        setError('code', { type: 'manual', message });
-      } else {
-        setError('phone', { type: 'manual', message });
-      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2 text-center">
-        <h2 className="text-2xl font-semibold text-slate-900">Вход в админку</h2>
-        <p className="text-sm text-slate-500">
-          Используйте корпоративный номер телефона для входа.
-        </p>
-      </div>
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div className="space-y-1">
-          <label className="text-sm font-medium text-slate-700" htmlFor="phone">
-            Номер телефона
-          </label>
-          <input
-            id="phone"
-            type="tel"
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none"
-            {...register('phone', {
-              required: 'Введите номер телефона',
-              minLength: { value: 12, message: 'Минимум 12 символов' },
-            })}
-            disabled={step === 'otp'}
-          />
-          {formState.errors.phone && (
-            <p className="text-sm text-red-500">{formState.errors.phone.message}</p>
-          )}
-          {debugOtp && step === 'otp' && (
-            <p className="text-xs text-emerald-600">Отладочный код: {debugOtp}</p>
-          )}
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12 sm:px-6 lg:px-8">
+      <div className="w-full max-w-md space-y-8">
+        <div>
+          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-slate-900">
+            Вход в админ панель
+          </h2>
+          <p className="mt-2 text-center text-sm text-slate-600">
+            Введите логин и пароль для доступа
+          </p>
         </div>
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
+          <div className="space-y-4 rounded-md shadow-sm">
+            <div>
+              <label htmlFor="username" className="block text-sm font-medium text-slate-700">
+                Логин
+              </label>
+              <input
+                {...register('username', {
+                  required: 'Введите логин',
+                  minLength: { value: 3, message: 'Логин должен быть не менее 3 символов' },
+                })}
+                id="username"
+                type="text"
+                autoComplete="username"
+                className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary sm:text-sm"
+                placeholder="Введите логин"
+                disabled={isSubmitting}
+              />
+              {formState.errors.username && (
+                <p className="mt-1 text-sm text-red-600">{formState.errors.username.message}</p>
+              )}
+            </div>
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-slate-700">
+                Пароль
+              </label>
+              <input
+                {...register('password', {
+                  required: 'Введите пароль',
+                  minLength: { value: 6, message: 'Пароль должен быть не менее 6 символов' },
+                })}
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary sm:text-sm"
+                placeholder="Введите пароль"
+                disabled={isSubmitting}
+              />
+              {formState.errors.password && (
+                <p className="mt-1 text-sm text-red-600">{formState.errors.password.message}</p>
+              )}
+            </div>
+          </div>
 
-        {step === 'otp' && (
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-slate-700" htmlFor="code">
-              Код из SMS
-            </label>
-            <input
-              id="code"
-              type="text"
-              maxLength={6}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-center text-lg tracking-[0.6em] focus:border-primary focus:outline-none"
-              {...register('code', {
-                required: 'Введите код',
-                minLength: { value: 4, message: 'Некорректный код' },
-              })}
-            />
-            {formState.errors.code && (
-              <p className="text-sm text-red-500">{formState.errors.code.message}</p>
-            )}
+          {errorMessage && (
+            <div className="rounded-md bg-red-50 p-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-red-800">{errorMessage}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div>
             <button
-              type="button"
-              className="text-sm text-primary hover:underline"
-              onClick={() => setStep('phone')}
+              type="submit"
+              disabled={isSubmitting}
+              className="group relative flex w-full justify-center rounded-md border border-transparent bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Изменить номер
+              {isSubmitting ? 'Вход...' : 'Войти'}
             </button>
           </div>
-        )}
-
-        <button
-          type="submit"
-          className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-dark disabled:opacity-60"
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? 'Обработка...' : step === 'phone' ? 'Получить код' : 'Подтвердить'}
-        </button>
-      </form>
-
-      <div className="rounded-lg bg-slate-50 p-4 text-xs text-slate-500">
-        <p className="font-medium text-slate-600">Справка:</p>
-        <p>После подтверждения номера откроется панель управления (пользователи, заказы, транзакции).</p>
-        <p>Код доступа направляется через GetSMS.
-        </p>
-        {errorMessage && <p className="mt-2 text-red-500">{errorMessage}</p>}
+        </form>
       </div>
     </div>
   );

@@ -52,19 +52,19 @@ class ProductCardSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return const Card(
       elevation: 2,
-      margin: const EdgeInsets.symmetric(vertical: 4),
+      margin: EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
-        leading: const SkeletonLoader(width: 48, height: 48, borderRadius: BorderRadius.all(Radius.circular(24))),
-        title: const SkeletonLoader(height: 16),
+        leading: SkeletonLoader(width: 48, height: 48, borderRadius: BorderRadius.all(Radius.circular(24))),
+        title: SkeletonLoader(height: 16),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 8),
-            const SkeletonLoader(height: 12),
-            const SizedBox(height: 4),
-            const SkeletonLoader(height: 12, width: 150),
+            SizedBox(height: 8),
+            SkeletonLoader(height: 12),
+            SizedBox(height: 4),
+            SkeletonLoader(height: 12, width: 150),
           ],
         ),
       ),

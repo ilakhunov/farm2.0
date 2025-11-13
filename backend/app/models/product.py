@@ -4,7 +4,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import ForeignKey, Numeric, String, Text
+from sqlalchemy import Enum, ForeignKey, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -27,7 +27,7 @@ class Product(Base):
     farmer_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    category: Mapped[ProductCategory] = mapped_column(nullable=False)
+    category: Mapped[ProductCategory] = mapped_column(Enum(ProductCategory, values_callable=lambda obj: [e.value for e in obj]), nullable=False)
     price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     quantity: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0.0)
     unit: Mapped[str] = mapped_column(String(32), nullable=False, default="kg")  # kg, piece, liter, etc.

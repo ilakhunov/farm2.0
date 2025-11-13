@@ -8,12 +8,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.core.security import create_token
+from app.core.security import create_token, get_password_hash, verify_password
 from app.db.session import get_db
 from app.models.otp import PhoneOTP
 from app.models.user import EntityType, User, UserRole
 from app.schemas.auth import (
     AuthResponse,
+    LoginRequest,
     SendOTPRequest,
     TokenResponse,
     UserProfile,
@@ -23,6 +24,57 @@ from app.services.sms import get_sms_provider
 from app.utils.phone import normalize_phone_number
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+@router.post("/login", response_model=AuthResponse)
+async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)) -> AuthResponse:
+    """Login with username and password (for admin panel)."""
+    settings = get_settings()
+    
+    # Find user by username
+    stmt = select(User).where(User.username == payload.username)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password"
+        )
+    
+    # Check password
+    if not user.password_hash or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password"
+        )
+    
+    # Check if user is active
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is disabled"
+        )
+    
+    # Create tokens
+    access_token = create_token(
+        subject=str(user.id),
+        expires_delta=timedelta(minutes=settings.access_token_expire_minutes),
+    )
+    refresh_token = create_token(
+        subject=str(user.id),
+        expires_delta=timedelta(minutes=settings.refresh_token_expire_minutes),
+    )
+    
+    return AuthResponse(
+        token=TokenResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_in=settings.access_token_expire_minutes * 60,
+            refresh_expires_in=settings.refresh_token_expire_minutes * 60,
+        ),
+        user=_map_user_profile(user),
+    )
 
 
 @router.post("/send-otp", status_code=status.HTTP_202_ACCEPTED)

@@ -10,9 +10,7 @@ import '../data/product_repository.dart';
 import '../models/product.dart';
 
 class ProductDetailScreen extends StatefulWidget {
-  const ProductDetailScreen({super.key, Product? product, String? productId})
-      : product = product,
-        productId = productId;
+  const ProductDetailScreen({super.key, this.product, this.productId});
 
   final Product? product;
   final String? productId;
@@ -118,6 +116,65 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       return;
     }
 
+    // Проверка доступного количества
+    if (quantity > _product!.quantity) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text('Доступно только ${_product!.quantity.toStringAsFixed(1)} ${_product!.unit}'),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    // Подтверждение создания заказа
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Подтверждение заказа'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Товар: ${_product!.name}'),
+            const SizedBox(height: 8),
+            Text('Количество: ${quantity.toStringAsFixed(1)} ${_product!.unit}'),
+            const SizedBox(height: 8),
+            Text(
+              'Сумма: ${(quantity * _product!.price).toStringAsFixed(2)} сум',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 16),
+            const Text('Вы уверены, что хотите оформить заказ?'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+            ),
+            child: const Text('Подтвердить'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
     setState(() {
       _isProcessing = true;
     });
@@ -150,21 +207,57 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
         } else {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Не удалось открыть ссылку: ${payment.paymentUrl}')),
-          );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(child: Text('Не удалось открыть ссылку: ${payment.paymentUrl}')),
+              ],
+            ),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
         }
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Платеж инициирован. Проверьте список транзакций.')),
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Expanded(child: Text('Платеж инициирован. Проверьте список транзакций.')),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 4),
+          ),
         );
       }
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка: $error')),
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Ошибка: ${error.toString().replaceFirst('Exception: ', '')}',
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+        ),
       );
     } finally {
       if (mounted) {
@@ -188,16 +281,35 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       return Scaffold(
         appBar: AppBar(title: const Text('Ошибка')),
         body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(_error ?? 'Продукт не найден'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _loadProduct,
-                child: const Text('Повторить'),
-              ),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: Colors.red[300],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _error ?? 'Продукт не найден',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Colors.grey[700],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: _loadProduct,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Повторить'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -304,7 +416,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '${product.price.toStringAsFixed(2)}',
+                      product.price.toStringAsFixed(2),
                       style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                         color: Colors.green[700],
                         fontWeight: FontWeight.bold,
@@ -378,7 +490,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             const SizedBox(height: 20),
             
             // Show farmer info for shops
-            if (_isShop && product.farmerId != null) ...[
+            if (_isShop) ...[
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -447,7 +559,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
                       : const Icon(Icons.shopping_cart_checkout),
-                  label: Text(_isProcessing ? 'Оформляем...' : 'Оформить заказ'),
+                  label: Text(_isProcessing ? 'Оформляем заказ...' : 'Оформить заказ'),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     backgroundColor: Theme.of(context).colorScheme.primary,

@@ -159,12 +159,16 @@ class _ProductCatalogScreenState extends State<ProductCatalogScreen> {
             icon: const Icon(Icons.add),
             tooltip: 'Создать товар',
             onPressed: () async {
+              // Save context before async operations
+              final messenger = ScaffoldMessenger.of(context);
+              final router = GoRouter.of(context);
+              
               // Double-check role before allowing creation
               final isFarmer = await UserStorage.isFarmer;
               if (!mounted) return;
               
               if (!isFarmer) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                messenger.showSnackBar(
                   const SnackBar(
                     content: Text('Только фермеры могут создавать товары'),
                     backgroundColor: Colors.red,
@@ -174,7 +178,7 @@ class _ProductCatalogScreenState extends State<ProductCatalogScreen> {
                 return;
               }
               
-              final result = await context.push('/products/create');
+              final result = await router.push('/products/create');
               if (!mounted) return;
               
               if (result == true) {
@@ -325,60 +329,99 @@ class _ProductCatalogScreenState extends State<ProductCatalogScreen> {
 
                 final products = snapshot.data ?? [];
                 if (products.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[400]),
-                        const SizedBox(height: 16),
-                        Text(
-                          _isFarmer ? 'У вас пока нет товаров' : 'Каталог пуст',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.grey[600]),
-                        ),
-                        const SizedBox(height: 8),
-                        ElevatedButton.icon(
-                          onPressed: () async {
-                            // Double-check role before allowing creation
-                            final isFarmer = await UserStorage.isFarmer;
-                            if (!mounted) return;
-                            
-                            if (!isFarmer) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Только фермеры могут создавать товары'),
-                                  backgroundColor: Colors.red,
-                                  duration: Duration(seconds: 3),
+                  return RefreshIndicator(
+                    onRefresh: _refresh,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: SizedBox(
+                        height: MediaQuery.of(context).size.height * 0.7,
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.inventory_2_outlined,
+                                size: 80,
+                                color: Colors.grey[400],
+                              ),
+                              const SizedBox(height: 24),
+                              Text(
+                                _isFarmer ? 'У вас пока нет товаров' : 'Каталог пуст',
+                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w600,
                                 ),
-                              );
-                              return;
-                            }
-                            
-                            final result = await context.push('/products/create');
-                            if (!mounted) return;
-                            
-                            if (result == true) {
-                              _refresh();
-                            }
-                          },
-                          icon: const Icon(Icons.add),
-                          label: const Text('Создать товар'),
+                              ),
+                              const SizedBox(height: 8),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 32),
+                                child: Text(
+                                  _isFarmer
+                                      ? 'Создайте свой первый товар, чтобы магазины могли его заказать'
+                                      : 'Товары появятся здесь, когда фермеры добавят их в каталог',
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Colors.grey[500],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              ElevatedButton.icon(
+                                onPressed: () async {
+                                  // Save context before async operations
+                                  final messenger = ScaffoldMessenger.of(context);
+                                  final router = GoRouter.of(context);
+                                  
+                                  // Double-check role before allowing creation
+                                  final isFarmer = await UserStorage.isFarmer;
+                                  if (!mounted) return;
+                                  
+                                  if (!isFarmer) {
+                                    messenger.showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Только фермеры могут создавать товары'),
+                                        backgroundColor: Colors.red,
+                                        duration: Duration(seconds: 3),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  
+                                  final result = await router.push('/products/create');
+                                  if (!mounted) return;
+                                  
+                                  if (result == true) {
+                                    _refresh();
+                                  }
+                                },
+                                icon: const Icon(Icons.add),
+                                label: const Text('Создать товар'),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
+                      ),
                     ),
                   );
                 }
 
                 return RefreshIndicator(
                   onRefresh: _refresh,
-                  child: ListView.separated(
+                  child: ListView.builder(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(16),
+                    itemCount: products.length,
                     itemBuilder: (context, index) {
                       final product = products[index];
-                      return Card(
-                        elevation: 2,
-                        margin: const EdgeInsets.symmetric(vertical: 4),
-                        child: ListTile(
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Card(
+                          elevation: 2,
+                          margin: EdgeInsets.zero,
+                          child: ListTile(
                           onTap: () => _openProduct(product),
                           leading: CircleAvatar(
                             backgroundColor: Theme.of(context).colorScheme.primaryContainer,
@@ -451,10 +494,9 @@ class _ProductCatalogScreenState extends State<ProductCatalogScreen> {
                             color: Theme.of(context).colorScheme.primary,
                           ),
                         ),
-                      );
+                      ),
+                    );
                     },
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemCount: products.length,
                   ),
                 );
               },

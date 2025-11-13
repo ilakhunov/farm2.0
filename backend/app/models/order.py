@@ -4,7 +4,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import ForeignKey, Numeric, String
+from sqlalchemy import Enum, ForeignKey, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -26,7 +26,7 @@ class Order(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     shop_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     farmer_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    status: Mapped[OrderStatus] = mapped_column(default=OrderStatus.PENDING, nullable=False)
+    status: Mapped[OrderStatus] = mapped_column(Enum(OrderStatus, values_callable=lambda obj: [e.value for e in obj]), default=OrderStatus.PENDING, nullable=False)
     total_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0.0)
     delivery_address: Mapped[str | None] = mapped_column(String(512), nullable=True)
     notes: Mapped[str | None] = mapped_column(String(1000), nullable=True)

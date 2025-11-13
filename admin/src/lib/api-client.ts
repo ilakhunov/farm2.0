@@ -73,7 +73,16 @@ export interface VerifyOtpPayload extends SendOtpPayload {
   email?: string;
 }
 
+export interface LoginPayload {
+  username: string;
+  password: string;
+}
+
 export const authApi = {
+  async login(payload: LoginPayload) {
+    const response = await apiClient.post<AuthResponse>('/auth/login', payload);
+    return response.data;
+  },
   async sendOtp(payload: SendOtpPayload) {
     const response = await apiClient.post<{ message: string; debug?: { otp?: string } }>(
       '/auth/send-otp',

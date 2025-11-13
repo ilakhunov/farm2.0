@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/storage/token_storage.dart';
 import '../data/product_repository.dart';
-import '../models/product.dart';
 
 class CreateProductScreen extends StatefulWidget {
   const CreateProductScreen({super.key});
@@ -48,7 +47,7 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
       final price = double.tryParse(_priceController.text.replaceAll(',', '.')) ?? 0.0;
       final quantity = double.tryParse(_quantityController.text.replaceAll(',', '.')) ?? 0.0;
 
-      final product = await _repository.createProduct(
+      await _repository.createProduct(
         name: _nameController.text.trim(),
         description: _descriptionController.text.trim().isEmpty 
             ? null 
@@ -82,8 +81,15 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Ошибка: $errorMessage'),
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(child: Text('Ошибка: $errorMessage')),
+            ],
+          ),
           backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 5),
         ),
       );
@@ -200,7 +206,7 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
 
               // Категория
               DropdownButtonFormField<String>(
-                value: _selectedCategory,
+                initialValue: _selectedCategory,
                 decoration: const InputDecoration(
                   labelText: 'Категория *',
                   border: OutlineInputBorder(),
