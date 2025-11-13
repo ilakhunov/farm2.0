@@ -9,6 +9,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
+from app.db.utils import utcnow
 
 
 class ProductCategory(str, enum.Enum):
@@ -27,16 +28,14 @@ class Product(Base):
     farmer_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    category: Mapped[ProductCategory] = mapped_column(
-        Enum(ProductCategory, native_enum=True, create_constraint=False, name="productcategory", values_callable=lambda obj: [e.value for e in obj]),
-        nullable=False
-    )
+    category: Mapped[ProductCategory] = mapped_column(Enum(ProductCategory, values_callable=lambda obj: [e.value for e in obj]), nullable=False)
     price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     quantity: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0.0)
     unit: Mapped[str] = mapped_column(String(32), nullable=False, default="kg")  # kg, piece, liter, etc.
     image_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    image_urls: Mapped[list[str] | None] = mapped_column(Text, nullable=True)  # JSON array of image URLs
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow, nullable=False)
 
     farmer = relationship("User", backref="products")

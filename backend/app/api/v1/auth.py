@@ -8,14 +8,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.core.dependencies import get_current_user
-from app.core.security import create_token
+from app.core.security import create_token, get_password_hash, verify_password
 from app.db.session import get_db
 from app.models.otp import PhoneOTP
 from app.models.user import EntityType, User, UserRole
 from app.schemas.auth import (
     AuthResponse,
-    LogoutResponse,
+    LoginRequest,
     SendOTPRequest,
     TokenResponse,
     UserProfile,
@@ -25,6 +24,57 @@ from app.services.sms import get_sms_provider
 from app.utils.phone import normalize_phone_number
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+@router.post("/login", response_model=AuthResponse)
+async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)) -> AuthResponse:
+    """Login with username and password (for admin panel)."""
+    settings = get_settings()
+    
+    # Find user by username
+    stmt = select(User).where(User.username == payload.username)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password"
+        )
+    
+    # Check password
+    if not user.password_hash or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password"
+        )
+    
+    # Check if user is active
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is disabled"
+        )
+    
+    # Create tokens
+    access_token = create_token(
+        subject=str(user.id),
+        expires_delta=timedelta(minutes=settings.access_token_expire_minutes),
+    )
+    refresh_token = create_token(
+        subject=str(user.id),
+        expires_delta=timedelta(minutes=settings.refresh_token_expire_minutes),
+    )
+    
+    return AuthResponse(
+        token=TokenResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_in=settings.access_token_expire_minutes * 60,
+            refresh_expires_in=settings.refresh_token_expire_minutes * 60,
+        ),
+        user=_map_user_profile(user),
+    )
 
 
 @router.post("/send-otp", status_code=status.HTTP_202_ACCEPTED)
@@ -44,8 +94,10 @@ async def send_otp(payload: SendOTPRequest, db: AsyncSession = Depends(get_db)) 
     result = await db.execute(stmt)
     existing_otp = result.scalar_one_or_none()
     now = datetime.utcnow()
-    if existing_otp and (now - existing_otp.created_at).total_seconds() < settings.otp_resend_interval_seconds:
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="OTP recently sent. Try again later.")
+    if existing_otp:
+        created_at_naive = existing_otp.created_at.replace(tzinfo=None) if existing_otp.created_at.tzinfo else existing_otp.created_at
+        if (now - created_at_naive).total_seconds() < settings.otp_resend_interval_seconds:
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="OTP recently sent. Try again later.")
 
     code = f"{random.randint(0, 999999):06d}"
     otp = PhoneOTP(
@@ -86,8 +138,10 @@ async def verify_otp(payload: VerifyOTPRequest, db: AsyncSession = Depends(get_d
     if not otp:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OTP not found")
 
-    now = datetime.utcnow()
-    if otp.expires_at < now:
+    from datetime import UTC
+    now = datetime.now(UTC)
+    expires_at_naive = otp.expires_at.replace(tzinfo=None) if otp.expires_at.tzinfo else otp.expires_at
+    if expires_at_naive.replace(tzinfo=None) < now.replace(tzinfo=None):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OTP expired")
     if otp.attempts >= otp.max_attempts:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OTP attempt limit exceeded")
@@ -121,7 +175,7 @@ async def verify_otp(payload: VerifyOTPRequest, db: AsyncSession = Depends(get_d
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Role mismatch")
         _update_user_metadata(user, payload)
 
-    await db.delete(otp)
+    db.delete(otp)
     await db.commit()
     await db.refresh(user)
 
@@ -146,8 +200,7 @@ async def verify_otp(payload: VerifyOTPRequest, db: AsyncSession = Depends(get_d
 
 
 def _resolve_entity_type(payload: VerifyOTPRequest) -> EntityType | None:
-    if payload.role == UserRole.FARMER:
-        return EntityType.FARMER
+    # EntityType doesn't have FARMER value, return None or payload.entity_type
     return payload.entity_type
 
 
@@ -164,20 +217,6 @@ def _update_user_metadata(user: User, payload: VerifyOTPRequest) -> None:
         user.bank_account = payload.bank_account
     if payload.email:
         user.email = payload.email
-
-
-@router.post("/logout", response_model=LogoutResponse, status_code=status.HTTP_200_OK)
-async def logout(
-    current_user: User = Depends(get_current_user),
-) -> LogoutResponse:
-    """
-    Logout endpoint for all user roles (farmer, shop, admin).
-    
-    Note: Since we're using stateless JWT tokens, the client should remove
-    the tokens from local storage. In a production environment, you might
-    want to implement a token blacklist using Redis.
-    """
-    return LogoutResponse(message="Successfully logged out")
 
 
 def _map_user_profile(user: User) -> UserProfile:

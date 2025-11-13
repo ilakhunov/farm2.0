@@ -7,6 +7,12 @@ from pydantic import BaseModel, Field
 from app.models.user import EntityType, UserRole
 
 
+class LoginRequest(BaseModel):
+    """Login request with username and password."""
+    username: str = Field(..., min_length=3, max_length=64)
+    password: str = Field(..., min_length=6)
+
+
 class SendOTPRequest(BaseModel):
     phone_number: str = Field(..., min_length=9, max_length=32)
     role: UserRole | None = None
@@ -51,7 +57,3 @@ class UserProfile(BaseModel):
 class AuthResponse(BaseModel):
     token: TokenResponse
     user: UserProfile
-
-
-class LogoutResponse(BaseModel):
-    message: str = "Successfully logged out"

@@ -25,10 +25,44 @@ class PaymentInitResult {
   });
 
   factory PaymentInitResult.fromJson(Map<String, dynamic> json) {
+    // Handle transactionId safely
+    String transactionId;
+    if (json['transaction_id'] is String) {
+      transactionId = json['transaction_id'] as String;
+    } else if (json['transaction_id'] is List) {
+      final list = json['transaction_id'] as List;
+      transactionId = list.isEmpty ? '' : list.first.toString();
+    } else {
+      transactionId = json['transaction_id']?.toString() ?? '';
+    }
+    
+    // Handle paymentUrl safely
+    String? paymentUrl;
+    if (json['payment_url'] == null) {
+      paymentUrl = null;
+    } else if (json['payment_url'] is String) {
+      paymentUrl = json['payment_url'] as String;
+    } else if (json['payment_url'] is List) {
+      final list = json['payment_url'] as List;
+      paymentUrl = list.isEmpty ? null : list.first.toString();
+    } else {
+      paymentUrl = json['payment_url'].toString();
+    }
+    
+    // Handle paymentData safely
+    Map<String, dynamic>? paymentData;
+    if (json['payment_data'] == null) {
+      paymentData = null;
+    } else if (json['payment_data'] is Map<String, dynamic>) {
+      paymentData = json['payment_data'] as Map<String, dynamic>;
+    } else {
+      paymentData = null;
+    }
+    
     return PaymentInitResult(
-      transactionId: json['transaction_id'] as String,
-      paymentUrl: json['payment_url'] as String?,
-      paymentData: json['payment_data'] as Map<String, dynamic>?,
+      transactionId: transactionId,
+      paymentUrl: paymentUrl,
+      paymentData: paymentData,
     );
   }
 

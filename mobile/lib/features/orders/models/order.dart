@@ -12,12 +12,42 @@ class OrderItem extends Equatable {
   });
 
   factory OrderItem.fromJson(Map<String, dynamic> json) {
+    // Handle ID fields safely
+    String id;
+    if (json['id'] is String) {
+      id = json['id'] as String;
+    } else {
+      id = json['id']?.toString() ?? '';
+    }
+    
+    String productId;
+    if (json['product_id'] is String) {
+      productId = json['product_id'] as String;
+    } else {
+      productId = json['product_id']?.toString() ?? '';
+    }
+    
+    // Handle numeric fields safely
+    double quantity;
+    if (json['quantity'] is num) {
+      quantity = (json['quantity'] as num).toDouble();
+    } else {
+      quantity = 0.0;
+    }
+    
+    double price;
+    if (json['price'] is num) {
+      price = (json['price'] as num).toDouble();
+    } else {
+      price = 0.0;
+    }
+    
     return OrderItem(
-      id: json['id'] as String,
-      productId: json['product_id'] as String,
-      quantity: (json['quantity'] as num).toDouble(),
-      price: (json['price'] as num).toDouble(),
-      product: json['product'] != null
+      id: id,
+      productId: productId,
+      quantity: quantity,
+      price: price,
+      product: json['product'] != null && json['product'] is Map<String, dynamic>
           ? Product.fromJson(json['product'] as Map<String, dynamic>)
           : null,
     );
@@ -49,16 +79,99 @@ class Order extends Equatable {
 
   factory Order.fromJson(Map<String, dynamic> json) {
     final itemsJson = json['items'] as List<dynamic>? ?? [];
+    
+    // Handle ID fields safely
+    String id;
+    if (json['id'] is String) {
+      id = json['id'] as String;
+    } else {
+      id = json['id']?.toString() ?? '';
+    }
+    
+    String shopId;
+    if (json['shop_id'] is String) {
+      shopId = json['shop_id'] as String;
+    } else {
+      shopId = json['shop_id']?.toString() ?? '';
+    }
+    
+    String farmerId;
+    if (json['farmer_id'] is String) {
+      farmerId = json['farmer_id'] as String;
+    } else {
+      farmerId = json['farmer_id']?.toString() ?? '';
+    }
+    
+    // Handle status safely
+    String status;
+    if (json['status'] is String) {
+      status = json['status'] as String;
+    } else {
+      status = json['status']?.toString() ?? 'pending';
+    }
+    
+    // Handle totalAmount safely
+    double totalAmount;
+    if (json['total_amount'] is num) {
+      totalAmount = (json['total_amount'] as num).toDouble();
+    } else {
+      totalAmount = 0.0;
+    }
+    
+    // Handle optional String fields safely
+    String? deliveryAddress;
+    if (json['delivery_address'] == null) {
+      deliveryAddress = null;
+    } else if (json['delivery_address'] is String) {
+      deliveryAddress = json['delivery_address'] as String;
+    } else if (json['delivery_address'] is List) {
+      final list = json['delivery_address'] as List;
+      deliveryAddress = list.isEmpty ? null : list.first.toString();
+    } else {
+      deliveryAddress = json['delivery_address'].toString();
+    }
+    
+    String? notes;
+    if (json['notes'] == null) {
+      notes = null;
+    } else if (json['notes'] is String) {
+      notes = json['notes'] as String;
+    } else if (json['notes'] is List) {
+      final list = json['notes'] as List;
+      notes = list.isEmpty ? null : list.first.toString();
+    } else {
+      notes = json['notes'].toString();
+    }
+    
+    // Handle datetime safely
+    DateTime createdAt;
+    if (json['created_at'] is String) {
+      createdAt = DateTime.parse(json['created_at'] as String);
+    } else if (json['created_at'] is DateTime) {
+      createdAt = json['created_at'] as DateTime;
+    } else {
+      createdAt = DateTime.now();
+    }
+    
+    DateTime updatedAt;
+    if (json['updated_at'] is String) {
+      updatedAt = DateTime.parse(json['updated_at'] as String);
+    } else if (json['updated_at'] is DateTime) {
+      updatedAt = json['updated_at'] as DateTime;
+    } else {
+      updatedAt = DateTime.now();
+    }
+    
     return Order(
-      id: json['id'] as String,
-      shopId: json['shop_id'] as String,
-      farmerId: json['farmer_id'] as String,
-      status: json['status'] as String,
-      totalAmount: (json['total_amount'] as num).toDouble(),
-      deliveryAddress: json['delivery_address'] as String?,
-      notes: json['notes'] as String?,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      id: id,
+      shopId: shopId,
+      farmerId: farmerId,
+      status: status,
+      totalAmount: totalAmount,
+      deliveryAddress: deliveryAddress,
+      notes: notes,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
       items: itemsJson.map((item) => OrderItem.fromJson(item as Map<String, dynamic>)).toList(),
     );
   }

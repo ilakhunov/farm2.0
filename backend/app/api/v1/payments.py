@@ -111,30 +111,40 @@ async def process_webhook(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Process webhook from payment provider."""
-    adapter = get_payment_adapter(provider)
-    webhook_data = await adapter.process_webhook(payload)
-    
-    # Update transaction status
-    if "transaction_id" in webhook_data:
-        transaction_id = UUID(webhook_data["transaction_id"])
-        stmt = select(Transaction).where(Transaction.id == transaction_id)
-        result = await db.execute(stmt)
-        transaction = result.scalar_one_or_none()
+    try:
+        adapter = get_payment_adapter(provider)
+        webhook_data = await adapter.process_webhook(payload)
         
-        if transaction:
-            if webhook_data.get("status") == "completed":
-                transaction.status = TransactionStatus.COMPLETED
-                # Update order status if payment successful
-                order_stmt = select(Order).where(Order.id == transaction.order_id)
-                order_result = await db.execute(order_stmt)
-                order = order_result.scalar_one_or_none()
-                if order:
-                    from app.models.order import OrderStatus
-                    if order.status.value == "pending":
-                        order.status = OrderStatus.CONFIRMED
-            elif webhook_data.get("status") == "failed":
-                transaction.status = TransactionStatus.FAILED
+        # Update transaction status
+        if "transaction_id" in webhook_data:
+            try:
+                transaction_id = UUID(webhook_data["transaction_id"])
+            except (ValueError, TypeError):
+                return {"status": "error", "detail": "Invalid transaction_id"}
             
-            await db.commit()
-    
-    return {"status": "ok"}
+            stmt = select(Transaction).where(Transaction.id == transaction_id)
+            result = await db.execute(stmt)
+            transaction = result.scalar_one_or_none()
+            
+            if transaction:
+                if webhook_data.get("status") == "completed":
+                    transaction.status = TransactionStatus.COMPLETED
+                    # Update order status if payment successful
+                    order_stmt = select(Order).where(Order.id == transaction.order_id)
+                    order_result = await db.execute(order_stmt)
+                    order = order_result.scalar_one_or_none()
+                    if order:
+                        from app.models.order import OrderStatus
+                        if order.status == OrderStatus.PENDING:
+                            order.status = OrderStatus.CONFIRMED
+                elif webhook_data.get("status") == "failed":
+                    transaction.status = TransactionStatus.FAILED
+                
+                await db.commit()
+            else:
+                return {"status": "error", "detail": "Transaction not found"}
+        
+        return {"status": "ok"}
+    except Exception as e:
+        await db.rollback()
+        return {"status": "error", "detail": str(e)}

@@ -7,18 +7,8 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
 from app.core.config import get_settings
+from app.db.base import Base
 from app.db.session import Base as SQLAlchemyBase
-
-# Import all models for autogenerate
-from app.models import (  # noqa: F401
-    Delivery,
-    Order,
-    OrderItem,
-    PhoneOTP,
-    Product,
-    Transaction,
-    User,
-)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

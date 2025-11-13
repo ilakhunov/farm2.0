@@ -16,7 +16,7 @@ class TokenStorage {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_accessTokenKey);
     await prefs.remove(_refreshTokenKey);
-    // Также очищаем информацию о пользователе
+    // Also clear user data
     await UserStorage.clear();
   }
 

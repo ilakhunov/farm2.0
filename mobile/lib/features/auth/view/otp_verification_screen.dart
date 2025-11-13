@@ -71,48 +71,19 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       await widget.onVerified(response);
     } on DioException catch (error) {
       if (!mounted) return;
-      String errorMessage = 'Request failed';
-      
-      // Извлекаем детальное сообщение из ответа backend
-      if (error.response != null) {
-        final data = error.response!.data;
-        if (data is Map<String, dynamic> && data.containsKey('detail')) {
-          errorMessage = data['detail'].toString();
-        } else if (error.response!.statusMessage != null) {
-          errorMessage = error.response!.statusMessage!;
-        }
-      } else if (error.message != null) {
-        errorMessage = error.message!;
-      }
-      
-      // Обработка специфичных ошибок
-      if (error.type == DioExceptionType.connectionTimeout ||
-          error.type == DioExceptionType.receiveTimeout) {
-        errorMessage = 'Connection timeout. Please check your internet connection.';
-      } else if (error.type == DioExceptionType.connectionError) {
-        errorMessage = 'Cannot connect to server. Please check your internet connection.';
-      }
-      
       setState(() {
-        _errorMessage = errorMessage;
+        _errorMessage = error.message ?? 'Request failed';
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMessage),
-          backgroundColor: Colors.redAccent,
-        ),
+        SnackBar(content: Text(_errorMessage!)),
       );
     } catch (error) {
       if (!mounted) return;
-      final errorMessage = error.toString();
       setState(() {
-        _errorMessage = errorMessage;
+        _errorMessage = error.toString();
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMessage),
-          backgroundColor: Colors.redAccent,
-        ),
+        SnackBar(content: Text(_errorMessage!)),
       );
     } finally {
       if (mounted) {

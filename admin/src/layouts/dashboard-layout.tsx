@@ -2,6 +2,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 
 import { Outlet } from 'react-router-dom';
 
+import { Breadcrumbs } from '../components/breadcrumbs';
 import { clearAuth, getUserRole } from '../lib/auth-storage';
 
 const navItems = [
@@ -16,8 +17,10 @@ export function DashboardLayout() {
   const location = useLocation();
 
   const handleLogout = () => {
-    clearAuth();
-    navigate('/');
+    if (window.confirm('Вы уверены, что хотите выйти из системы?')) {
+      clearAuth();
+      navigate('/');
+    }
   };
 
   const role = getUserRole();
@@ -31,9 +34,12 @@ export function DashboardLayout() {
             <span className="text-sm text-slate-600 capitalize">{role || 'admin'}</span>
             <button
               onClick={handleLogout}
-              className="rounded-md border border-slate-300 px-3 py-1 text-sm hover:bg-slate-200"
+              className="flex items-center gap-2 rounded-md border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 transition-colors"
             >
-              Logout
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              Выйти
             </button>
           </div>
         </div>
@@ -56,6 +62,7 @@ export function DashboardLayout() {
         </nav>
       </header>
       <main className="mx-auto mt-6 max-w-7xl px-6">
+        <Breadcrumbs />
         <Outlet />
       </main>
     </div>

@@ -31,4 +31,7 @@ build/
 
 # Local env files
 backend/.env
-farm2.0/
+.project_pids
+backend/.env
+admin/.env
+mobile/.env

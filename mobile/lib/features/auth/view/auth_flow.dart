@@ -1,10 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/app_localizations.dart';
 import '../../../core/storage/token_storage.dart';
 import '../../../core/storage/user_storage.dart';
-import '../../products/view/product_catalog_screen.dart';
 import '../data/auth_repository.dart';
 import '../models/auth_models.dart';
 import 'otp_verification_screen.dart';
@@ -22,6 +22,44 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
   PhoneFormResult? _currentForm;
   String? _debugOtp;
 
+  @override
+  void initState() {
+    super.initState();
+    // Check if user is already authenticated and show option to continue
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkExistingAuth();
+    });
+  }
+  
+  Future<void> _checkExistingAuth() async {
+    final token = await TokenStorage.accessToken;
+    if (token != null && token.isNotEmpty && mounted) {
+      // User is already authenticated, but we're showing auth screen
+      // They can continue or logout
+      final strings = AppLocalizations.of(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.info_outline, color: Colors.white),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(strings.translate('auth_already_logged_in') ?? 'Вы уже авторизованы'),
+              ),
+              TextButton(
+                onPressed: () {
+                  context.go('/products');
+                },
+                child: const Text('Продолжить', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
+  }
+
   Future<String?> _sendOtp(PhoneFormResult result) async {
     try {
       final debugOtp = await _authRepository.sendOtp(
@@ -36,29 +74,7 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
       });
       return debugOtp;
     } on DioException catch (error) {
-      String errorMessage = 'Request failed';
-      
-      // Извлекаем детальное сообщение из ответа backend
-      if (error.response != null) {
-        final data = error.response!.data;
-        if (data is Map<String, dynamic> && data.containsKey('detail')) {
-          errorMessage = data['detail'].toString();
-        } else if (error.response!.statusMessage != null) {
-          errorMessage = error.response!.statusMessage!;
-        }
-      } else if (error.message != null) {
-        errorMessage = error.message!;
-      }
-      
-      // Обработка специфичных ошибок
-      if (error.type == DioExceptionType.connectionTimeout ||
-          error.type == DioExceptionType.receiveTimeout) {
-        errorMessage = 'Connection timeout. Please check your internet connection.';
-      } else if (error.type == DioExceptionType.connectionError) {
-        errorMessage = 'Cannot connect to server. Please check your internet connection.';
-      }
-      
-      _showError(errorMessage);
+      _showError(error.message ?? 'Request failed');
       rethrow;
     } catch (error) {
       _showError(error.toString());
@@ -83,20 +99,16 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
       accessToken: response.tokens.accessToken,
       refreshToken: response.tokens.refreshToken,
     );
-    await UserStorage.saveUser(
-      role: response.user.role,
-      id: response.user.id,
-      phoneNumber: response.user.phoneNumber,
-    );
+    // Save user information
+    await UserStorage.saveUser(response.user);
     if (!mounted) return;
     final strings = AppLocalizations.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(strings.translate('auth_success'))),
     );
-    // Navigate to catalog
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const ProductCatalogScreen()),
-    );
+    // Navigate to catalog using GoRouter
+    if (!mounted) return;
+    context.go('/products');
   }
 
   void _restart() {

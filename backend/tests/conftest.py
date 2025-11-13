@@ -1,15 +1,15 @@
 """Pytest configuration and fixtures."""
 
 import os
-from collections.abc import AsyncGenerator
-
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from collections.abc import AsyncGenerator
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import StaticPool
-from httpx import AsyncClient, ASGITransport
 
 from app.db.session import Base, get_db
 from app.main import app
+from httpx import AsyncClient
+from httpx._transports.asgi import ASGITransport
 
 
 # Override database URL for tests
@@ -37,32 +37,124 @@ async def test_engine():
     await engine.dispose()
 
 
-@pytest.fixture(scope="session")
-def test_session_factory(test_engine):
-    """Create session factory for tests."""
-    return async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
-
-
 @pytest.fixture
-async def db_session(test_session_factory):
+async def db_session(test_engine):
     """Create database session for tests."""
-    async with test_session_factory() as session:
+    async_session = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+    async with async_session() as session:
         yield session
         await session.rollback()
 
 
 @pytest.fixture
-async def client(test_session_factory):
-    """Create test HTTP client with overridden database dependency."""
-    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
-        async with test_session_factory() as session:
-            yield session
-            await session.rollback()
-
-    app.dependency_overrides[get_db] = override_get_db
+async def override_get_db(db_session):
+    """Override get_db dependency for tests."""
+    async def _get_db() -> AsyncGenerator[AsyncSession, None]:
+        yield db_session
     
+    app.dependency_overrides[get_db] = _get_db
+    yield
+    app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.fixture
+async def client(override_get_db):
+    """Create test HTTP client."""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
+
+
+@pytest.fixture
+async def farmer_token(client: AsyncClient, db_session):
+    """Create a farmer user and return access token."""
+    from app.models.otp import PhoneOTP
+    from sqlalchemy import delete
     
-    # Clean up dependency override after test
-    app.dependency_overrides.clear()
+    phone = "+998901234567"
+    
+    # Clear any existing OTPs for this phone to avoid rate limiting
+    await db_session.execute(delete(PhoneOTP).where(PhoneOTP.phone_number == phone))
+    await db_session.commit()
+    
+    # Send OTP
+    send_response = await client.post(
+        "/api/v1/auth/send-otp",
+        json={"phone_number": phone, "role": "farmer"},
+    )
+    assert send_response.status_code in [202, 429], f"Unexpected status: {send_response.status_code}, {send_response.json()}"
+    
+    if send_response.status_code == 429:
+        # If rate limited, wait a bit and try again
+        import asyncio
+        await asyncio.sleep(0.1)
+        await db_session.execute(delete(PhoneOTP).where(PhoneOTP.phone_number == phone))
+        await db_session.commit()
+        send_response = await client.post(
+            "/api/v1/auth/send-otp",
+            json={"phone_number": phone, "role": "farmer"},
+        )
+    
+    assert send_response.status_code == 202, f"Failed to send OTP: {send_response.json()}"
+    otp_code = send_response.json().get("debug", {}).get("otp")
+    assert otp_code, "OTP code not found in response"
+    
+    # Verify OTP
+    verify_response = await client.post(
+        "/api/v1/auth/verify-otp",
+        json={"phone_number": phone, "code": otp_code, "role": "farmer"},
+    )
+    assert verify_response.status_code == 200, f"Failed to verify OTP: {verify_response.json()}"
+    return verify_response.json()["token"]["access_token"]
+
+
+@pytest.fixture
+async def shop_token(client: AsyncClient, db_session):
+    """Create a shop user and return access token."""
+    from app.models.otp import PhoneOTP
+    from sqlalchemy import delete
+    
+    phone = "+998901234568"
+    
+    # Clear any existing OTPs for this phone to avoid rate limiting
+    await db_session.execute(delete(PhoneOTP).where(PhoneOTP.phone_number == phone))
+    await db_session.commit()
+    
+    # Send OTP
+    send_response = await client.post(
+        "/api/v1/auth/send-otp",
+        json={"phone_number": phone, "role": "shop"},
+    )
+    assert send_response.status_code in [202, 429], f"Unexpected status: {send_response.status_code}, {send_response.json()}"
+    
+    if send_response.status_code == 429:
+        # If rate limited, wait a bit and try again
+        import asyncio
+        await asyncio.sleep(0.1)
+        await db_session.execute(delete(PhoneOTP).where(PhoneOTP.phone_number == phone))
+        await db_session.commit()
+        send_response = await client.post(
+            "/api/v1/auth/send-otp",
+            json={"phone_number": phone, "role": "shop"},
+        )
+    
+    assert send_response.status_code == 202, f"Failed to send OTP: {send_response.json()}"
+    otp_code = send_response.json().get("debug", {}).get("otp")
+    assert otp_code, "OTP code not found in response"
+    
+    # Verify OTP
+    verify_response = await client.post(
+        "/api/v1/auth/verify-otp",
+        json={"phone_number": phone, "code": otp_code, "role": "shop"},
+    )
+    assert verify_response.status_code == 200, f"Failed to verify OTP: {verify_response.json()}"
+    return verify_response.json()["token"]["access_token"]
+
+
+@pytest.fixture
+async def farmer_id(client: AsyncClient, farmer_token: str):
+    """Get farmer user ID."""
+    response = await client.get(
+        "/api/v1/users/me",
+        headers={"Authorization": f"Bearer {farmer_token}"},
+    )
+    return response.json()["id"]

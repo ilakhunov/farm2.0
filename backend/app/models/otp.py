@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
+from app.db.utils import utcnow
 
 
 class PhoneOTP(Base):
@@ -19,7 +20,7 @@ class PhoneOTP(Base):
     expires_at: Mapped[datetime] = mapped_column(nullable=False)
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     max_attempts: Mapped[int] = mapped_column(Integer, default=5)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow, nullable=False)
     user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
 
     user = relationship("User", backref="otps")

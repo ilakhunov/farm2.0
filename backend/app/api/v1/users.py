@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth import _map_user_profile
 from app.core.dependencies import get_current_user
 from app.db.session import get_db
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.user import UserResponse, UserUpdateRequest
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -34,3 +37,27 @@ async def update_me(
     await db.commit()
     await db.refresh(current_user)
     return _map_user_profile(current_user)
+
+
+@router.get("", response_model=list[UserResponse])
+async def list_users(
+    role: UserRole | None = Query(None),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[UserResponse]:
+    """List users (admin only)."""
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can list users")
+    
+    stmt = select(User)
+    
+    if role:
+        stmt = stmt.where(User.role == role)
+    
+    stmt = stmt.order_by(User.created_at.desc()).limit(limit).offset(offset)
+    result = await db.execute(stmt)
+    users = result.scalars().all()
+    
+    return [_map_user_profile(user) for user in users]

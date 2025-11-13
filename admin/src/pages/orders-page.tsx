@@ -6,9 +6,8 @@ import { ordersApi, Order } from '../lib/api-client';
 const STATUS_COLORS: Record<Order['status'], string> = {
   pending: 'bg-amber-100 text-amber-700',
   confirmed: 'bg-blue-100 text-blue-700',
-  preparing: 'bg-purple-100 text-purple-700',
-  ready: 'bg-indigo-100 text-indigo-700',
-  delivering: 'bg-cyan-100 text-cyan-700',
+  processing: 'bg-purple-100 text-purple-700',
+  shipped: 'bg-cyan-100 text-cyan-700',
   delivered: 'bg-emerald-100 text-emerald-700',
   cancelled: 'bg-red-100 text-red-700',
 };
@@ -16,9 +15,8 @@ const STATUS_COLORS: Record<Order['status'], string> = {
 const STATUS_LABELS: Record<Order['status'], string> = {
   pending: 'Ожидает',
   confirmed: 'Подтверждён',
-  preparing: 'Готовится',
-  ready: 'Готов',
-  delivering: 'Доставляется',
+  processing: 'Обрабатывается',
+  shipped: 'Отправлен',
   delivered: 'Доставлен',
   cancelled: 'Отменён',
 };
@@ -174,5 +172,4 @@ export function OrdersPage() {
     </section>
   );
 }
-
 
